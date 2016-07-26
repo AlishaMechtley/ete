@@ -641,7 +641,6 @@ class Test_Coretype_Tree(unittest.TestCase):
         self.assertEqual(t.children[0].dist, 5.0)
         self.assertEqual(t.children[1].dist, 5.0)
 
-
     def test_tree_navigation(self):
         t = Tree("(((A, B)H, C)I, (D, F)J)root;", format=1)
         postorder = [n.name for n in t.traverse("postorder")]
@@ -651,7 +650,7 @@ class Test_Coretype_Tree(unittest.TestCase):
         self.assertEqual(postorder, ['A', 'B', 'H', 'C', 'I', 'D', 'F', 'J', 'root'])
         self.assertEqual(preorder, ['root', 'I', 'H', 'A', 'B', 'C', 'J', 'D', 'F'])
         self.assertEqual(levelorder, ['root', 'I', 'J', 'H', 'C', 'D', 'F', 'A', 'B'])
-        ancestors = [n.name for n in (t&"B").get_ancestors()]
+        ancestors = [n.name for n in (t & "B").get_ancestors()]
         self.assertEqual(ancestors, ["H", "I", "root"])
         self.assertEqual(t.get_ancestors(), [])
 
@@ -667,20 +666,21 @@ class Test_Coretype_Tree(unittest.TestCase):
         cache_node = t.get_cached_content()
         cache_node_leaves_only_false = t.get_cached_content(leaves_only=False)
         self.assertEqual(cache_node[t], set(t.get_leaves()))
-        self.assertEqual(cache_node_leaves_only_false[t], t)
+        self.assertEqual(cache_node_leaves_only_false[t], set(t.traverse()))
 
         cache_name = t.get_cached_content(store_attr="name")
         cache_name_leaves_only_false = t.get_cached_content(store_attr="name", leaves_only=False)
-        self.assertEqual(cache_name[t], set(t.get_leaf_names()))
-        self.assertEqual(cache_name_leaves_only_false[t], [t.name])
+        names = set(t.get_leaf_names())
+        self.assertEqual(cache_name[t], names)
+        names.update({''})
+        self.assertEqual(cache_name_leaves_only_false[t], names)
 
         cache_many = t.get_cached_content(store_attr=["name", "dist", "support"])
         cache_many_lof = t.get_cached_content(store_attr=["name", "dist", "support"], leaves_only=False)
-        self.assertEqual(cache_many[t], set([(leaf.name, leaf.dist, leaf.support) for leaf in t.get_leaves()]))
-        self.assertEqual(cache_many_lof[t], [(t.name, t.dist, t.support)])
-
-
-        #self.assertEqual(cache_name_lof[t], [t.name])
+        trifecta = set([(leaf.name, leaf.dist, leaf.support) for leaf in t.get_leaves()])
+        self.assertEqual(cache_many[t], trifecta)
+        trifecta.update({('', 1.0, 1.0)})
+        self.assertEqual(cache_many_lof[t], trifecta)
 
 
     def test_rooting(self):
