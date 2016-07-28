@@ -51,7 +51,7 @@ class Test_ncbiquery(unittest.TestCase):
     self.assertEqual(name2id['homo sapiens'], [9606])
 
     name2id = ncbi.get_name_translator(['Bacteria'])
-    self.assertEqual(set(name2id['Bacteria']), set([2, 629395]))
+    self.assertEqual(set(name2id['Bacteria']), set([2]))
 
     out = ncbi.get_descendant_taxa("9605", intermediate_nodes=True)
     #Out[9]: [1425170, 741158, 63221, 9606]
