@@ -42,8 +42,9 @@
 
 from __future__ import absolute_import
 from __future__ import print_function
-import sys
+
 import os
+import sys
 
 TOOLSPATH = os.path.realpath(os.path.split(os.path.realpath(__file__))[0])
 #sys.path.insert(0, TOOLSPATH)
@@ -53,10 +54,11 @@ TOOLSPATH = os.path.realpath(os.path.split(os.path.realpath(__file__))[0])
 import argparse
 from . import (ete_split, ete_expand, ete_annotate, ete_ncbiquery, ete_view,
                ete_generate, ete_mod, ete_extract, ete_compare, ete_evol,
-               ete_maptrees, ete_treematcher)
+               ete_maptrees)
+from ete3.tools import ete_treematcher
 from . import common
 from .common import log
-from .utils import colorify, which
+from .utils import which
 
 """
 def ete_split(args):
@@ -210,7 +212,7 @@ def _main(arguments):
 
     # -treematcher-
     treematcher_args_p = subparser.add_parser("treematcher", parents=[source_args_p, main_args_p],
-                                           description=ete_treematcher.DESC)
+                                              description=ete_treematcher.DESC)
     treematcher_args_p.set_defaults(func=ete_treematcher.run)
     ete_treematcher.populate_args(treematcher_args_p)
 
