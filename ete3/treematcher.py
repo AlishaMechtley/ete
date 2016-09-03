@@ -5,9 +5,9 @@ from itertools import permutations
 # third party modules
 import ast
 import six
-from .coretype import Tree
-from .ncbi_taxonomy import NCBITaxa
-from .phylo import PhyloTree
+from .coretype.tree import Tree
+#from .ncbi_taxonomy import NCBITaxa
+#from .phylo import PhyloTree
 
 # internal modules
 # ...
