@@ -9,8 +9,6 @@ from .coretype import Tree
 from .ncbi_taxonomy import NCBITaxa
 from .phylo import PhyloTree
 
-#from ete3 import PhyloTree, Tree, NCBITaxa
-
 # internal modules
 # ...
 
