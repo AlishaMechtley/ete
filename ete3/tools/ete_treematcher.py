@@ -1,10 +1,12 @@
 
 import sys
-from logging import log
+#from logging import log
+from .common import log
 from argparse import ArgumentParser
-from ete3.tools.common import src_tree_iterator
-from ete3.phylo import PhyloTree
+from ..tools.common import src_tree_iterator
+from ..phylo import PhyloTree
 from ..treematcher import TreePattern, TreePatternCache
+
 #must be run inside ete
 
 
