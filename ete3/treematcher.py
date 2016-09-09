@@ -5,9 +5,7 @@ from itertools import permutations
 # third party modules
 import ast
 import six
-from .coretype.tree import Tree
-#from .ncbi_taxonomy import NCBITaxa
-#from .phylo import PhyloTree
+from ete3 import PhyloTree, Tree, NCBITaxa
 
 # internal modules
 # ...
@@ -164,6 +162,46 @@ class PatternSyntax(object):
         return(events.count('S'))
 
 
+    # TODO: review next function
+
+    def smart_lineage(self, constraint):
+        """ Get names instead of tax ids if a string is given before the "in
+        @.linage" in a query. Otherwise, returns Taxonomy ids. Function also
+        works for constraint that contains something besides the given target
+        node (e.g., @.children[0].lineage).
+
+        :param constraint: Internal use.
+
+        :return:  Returns list of lineage tax ids if taxid is searched,
+        otherwise returns names in lineage. """
+
+        parsedPattern = ast.parse(constraint, mode='eval')
+
+        lineage_node = [n for n in ast.walk(parsedPattern)
+                        if hasattr(n, 'comparators') and type(n.comparators[0]) == ast.Attribute
+                        and n.comparators[0].attr == "lineage"]
+
+        index = 0
+        for lineage_search in lineage_node:
+            if hasattr(lineage_node[index].left,'s'):
+                # retrieve what is between __target and .lineage
+                found_target = (re.search(r'__target[^ ]*\.lineage', constraint).span())
+                extracted_target = constraint[found_target[0]: found_target[1]]
+
+                syntax = "(ncbi.get_taxid_translator(" + \
+                         str(extracted_target) + ")).values()"
+                if index == 0:
+                    constraint = constraint.replace(str(extracted_target), syntax, 1)
+                else:
+
+                    constraint = re.sub(r'^((.*?' + extracted_target + r'.*?){' + str(index) + r'})' + extracted_target,
+                             r'\1' + syntax, constraint)
+
+            index += 1
+
+        return constraint
+
+
 class TreePattern(Tree):
     def __str__(self):
         return self.get_ascii(show_internal=True, attributes=["name"])
@@ -205,26 +243,89 @@ class TreePattern(Tree):
         # does the target node match the root node of the pattern?
         status = self.is_local_match(node, cache)
 
+        #print("match node {} to self {}".format(node.name, self.name))
+
+        if not status:
+            if self.up is not None and self.up.name == '+':  # skip node by resetting pattern
+                status = True
+                self = self.up
+
+        #print ("status is {} and self is {}".format(status, self.name))
+
         # if so, continues evaluating children pattern nodes against target node
         # children
+
+
         if status and self.children:
 
-                # print("Now checking Children")
-                if len(node.children) >= len(self.children):
-                    # If pattern node expects children nodes, tries to find a
-                    # combination of target node children that match the pattern
-                    for candidate in permutations(node.children):
-                        sub_status = True
-                        # if child status is false, but last True was +, ignore the false
-                        for i in range(len(self.children)):
-                            st = self.children[i].match(candidate[i], cache)
-                            if st is not None:
-                                sub_status &= st
-                        status = sub_status
-                        if status:
-                            break
-                else:
-                    status = False
+                #if the number of children do not match, find where they do and check that
+                nodes = []
+                #print("now checking children")
+
+                if len(node.children) < len(self.children):
+                    #print("len(node.children) {} < len(self.children) {} for node {} and self {}".format(len(node.children), len(self.children), node.name, self.name))
+                    #print(node)
+                    if self.name == '+':
+                        count = 0
+                        for skip_to_node in node.traverse(strategy="levelorder"):
+                            # skip to node with correct number of children
+                            #print("Checking node {}".format(skip_to_node.name, len(skip_to_node.children)))
+                            if len(skip_to_node.children) >= len(self.children):
+                                count += 1
+                                nodes += [skip_to_node]
+                                #print("################# skipped to node {}".format(skip_to_node.name))
+                                sisters = skip_to_node.get_sisters()
+                                if len(sisters) > 0:
+                                   for sister in sisters:
+                                       #print("adding sister {} of skipped to node {}".format(sister.name, skip_to_node.name))
+                                       nodes += [sister]
+                                       #print("nodes are now {}".format(nodes))
+
+                                break
+                        if count < 1:
+                            #print("not enough target children found")
+                            status = False
+
+                    else:
+                        #print("setting status to false")
+                        status = False
+
+                # If pattern node expects children nodes, tries to find a
+                # combination of target node children that match the pattern
+
+                if len(nodes) == 0:
+                    nodes = [node]
+
+                for node in nodes:
+                    sub_status_count = 0
+                    if len(node.children) >= len(self.children):
+                        for candidate in permutations(node.children):
+                            sub_status = True
+
+                            for i in range(len(self.children)):
+                                st = self.children[i].match(candidate[i], cache)
+                                #print("st is {} and self is {}".format(st, self.name))
+
+                                #if parent in pattern is plus and there more children to check, keep going
+                                #if st == False and self.name == '+' and len(candidate[i].children)>0 and \
+                                #        any([len(sis.children) > 0 for sis in node.get_sisters()]):
+
+                                if st == False and self.name == '+' and len(candidate[i].children) > 0:
+                                    #print("######## skipping status")
+                                    pass
+
+
+                                else:
+                                    sub_status_count += 1
+                                    sub_status &= st
+
+                            if sub_status and sub_status_count > 0:
+                                status = True
+                                break
+                            else:
+                                status = False
+                    if status and sub_status_count > 0:
+                        break
 
         return status
 
@@ -250,8 +351,9 @@ class TreePattern(Tree):
         elif '@' in self.name:
             # converts references to node itself
             constraint = self.name.replace('@', '__target_node')
-        elif '*' == self.name:
-            # star pattern node should match any target node
+
+        elif '+' == self.name:
+            # plus pattern node should match any target node
             constraint = ''
 
         else:
@@ -312,11 +414,11 @@ class TreePattern(Tree):
 
         num_hits = 0
         for node in tree.traverse(target_traversal):
+            #print("\n\n checking node {}".format(node.name))
             if self.match(node, cache):
                 num_hits += 1
                 yield node
+            #else:
+            #    print("no match for node {}".format(node.name))
             if maxhits is not None and num_hits >= maxhits:
                 break
-
-
-
